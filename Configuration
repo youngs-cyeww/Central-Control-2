@@ -1,0 +1,27 @@
+Central_control_mqtt/
+│
+├── main.py            # 中控核心（MQTT 取代 Flask）
+├── config.py          # 地圖 / MQTT / MySQL 設定
+├── database.py        # MySQL 操作
+├── path_planner.py    # A* + 避讓（幾乎不變）
+├── requirements.txt
+
+======================================================================
+
+ESP32 → 中控（上報）
+topic: vehicle/car3/status
+{
+  "x": 5,
+  "y": 7,
+  "battery": 81,
+  "status": "moving"
+}
+
+
+
+中控 → ESP32（指令）
+topic: vehicle/car3/cmd
+{
+  "next_x": 6,
+  "next_y": 7
+}
