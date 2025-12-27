@@ -1,0 +1,150 @@
+一、整體環境藍圖（先建立正確心智）
+Windows
+├─ 官方 Python（不是 Conda）
+│   └─ venv（虛擬環境）
+├─ MySQL Server（獨立安裝）
+├─ Mosquitto (MQTT Broker)
+└─ Central Control (Python 程式)
+
+
+📌 關鍵原則
+
+❌ 不混 Conda
+
+❌ 不混 pip / conda
+
+✅ 一個專案一個 venv
+
+✅ MySQL 只跟 Python 溝通，不碰 ESP32
+
+二、MySQL 安裝（只做一次）
+1️⃣ 下載 MySQL Server（官方）
+
+版本建議：MySQL 8.0.x
+
+安裝時選：
+
+✔ MySQL Server
+
+✔ MySQL Command Line Client
+
+✔ MySQL Workbench（可有可無，但建議）
+
+設定時注意
+
+記住 root 密碼
+
+Port 用預設 3306
+
+字元集選 utf8mb4
+
+2️⃣ 確認 MySQL 正常
+
+打開 MySQL Command Line Client，輸入密碼後：
+
+SHOW DATABASES;
+
+
+如果有看到清單 → MySQL OK ✅
+
+三、建立你的資料庫結構（一次搞定）
+CREATE DATABASE logistics CHARACTER SET utf8mb4;
+USE logistics;
+
+CREATE TABLE vehicles (
+    id INT PRIMARY KEY,
+    x INT,
+    y INT,
+    battery INT,
+    status VARCHAR(20),
+    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE tasks (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    vehicle_id INT,
+    target_x INT,
+    target_y INT,
+    done BOOLEAN DEFAULT 0
+);
+
+
+📌 last_seen 之後可以用來判斷「車輛離線」
+
+四、Python 環境架設（重點，避免你之前炸掉）
+1️⃣ 安裝「官方 Python」
+
+只從 python.org 下載
+
+安裝時 一定要勾
+
+☑ Add Python to PATH
+
+
+確認：
+
+python --version
+pip --version
+
+2️⃣ 建立虛擬環境（取代 Conda）
+
+在你的專案資料夾：
+
+python -m venv cc_env
+cc_env\Scripts\activate
+
+
+你會看到：
+
+(cc_env)
+
+
+📌 只要看到這個，就代表你是安全的
+
+3️⃣ 安裝套件（穩定版）
+pip install paho-mqtt mysql-connector-python
+
+
+或用 requirements.txt：
+
+pip install -r requirements.txt
+
+五、MySQL 與 Python 的正確連線方式
+1️⃣ config.py（你已經有，但我再標準化一次）
+MYSQL_CONFIG = {
+    "host": "127.0.0.1",
+    "user": "root",
+    "password": "你的密碼",
+    "database": "logistics",
+    "auth_plugin": "mysql_native_password"
+}
+
+
+📌 用 127.0.0.1 比 localhost 穩
+📌 auth_plugin 可避免 8.0 驗證問題
+
+2️⃣ database.py（安全寫法）
+import mysql.connector
+from mysql.connector import pooling
+from config import MYSQL_CONFIG
+
+pool = pooling.MySQLConnectionPool(
+    pool_name="cc_pool",
+    pool_size=5,
+    **MYSQL_CONFIG
+)
+
+def get_conn():
+    return pool.get_connection()
+
+使用時（範例）
+def update_vehicle(...):
+    conn = get_conn()
+    cursor = conn.cursor(dictionary=True)
+    cursor.execute(...)
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+📌 連線池 = 不會連一連斷掉
